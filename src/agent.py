@@ -15,10 +15,8 @@ import os
 import sys
 import json
 import time
-import asyncio
 import psutil
 import subprocess
-import websockets
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict
