@@ -1,0 +1,149 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # Build for Linux
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm rpmdevtools
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt
+
+      - name: Build standalone executable
+        run: |
+          cd src
+          pyinstaller --onefile --name agentsmith main.py
+          mv dist/agentsmith ../agentsmith-linux-x64
+
+      - name: Build RPM package
+        run: |
+          mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          cp agentsmith-linux-x64 ~/rpmbuild/SOURCES/
+          cp packaging/rpm/agentsmith.spec ~/rpmbuild/SPECS/
+          rpmbuild -bb ~/rpmbuild/SPECS/agentsmith.spec
+          cp ~/rpmbuild/RPMS/x86_64/*.rpm ./agentsmith.rpm
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentsmith-linux
+          path: |
+            agentsmith-linux-x64
+            agentsmith.rpm
+
+  # Build for Windows
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt
+
+      - name: Build standalone executable
+        run: |
+          cd src
+          pyinstaller --onefile --name agentsmith main.py
+          Move-Item -Path dist\agentsmith.exe -Destination ..\agentsmith-windows-x64.exe
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentsmith-windows
+          path: agentsmith-windows-x64.exe
+
+  # Build for macOS
+  build-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt
+
+      - name: Build standalone executable
+        run: |
+          cd src
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            pyinstaller --onefile --name agentsmith --target-arch arm64 main.py
+          else
+            pyinstaller --onefile --name agentsmith --target-arch x86_64 main.py
+          fi
+          mv dist/agentsmith ../agentsmith-macos-${{ matrix.arch }}
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentsmith-macos-${{ matrix.arch }}
+          path: agentsmith-macos-${{ matrix.arch }}
+
+  # Create Release (only on tags)
+  release:
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/agentsmith-linux/agentsmith-linux-x64
+            artifacts/agentsmith-linux/agentsmith.rpm
+            artifacts/agentsmith-windows/agentsmith-windows-x64.exe
+            artifacts/agentsmith-macos-x64/agentsmith-macos-x64
+            artifacts/agentsmith-macos-arm64/agentsmith-macos-arm64
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
