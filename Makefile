@@ -1,7 +1,7 @@
 .PHONY: all build clean install rpm test
 
 # Variables
-APP_NAME := agentsmith
+APP_NAME := super-palm-tree
 VERSION := 1.0.0
 BUILD_DIR := build
 DIST_DIR := dist
@@ -35,13 +35,13 @@ build-macos:
 rpm: build-linux
 	@echo "Building RPM package..."
 	mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-	cp $(DIST_DIR)/$(APP_NAME)-linux-x64 ~/rpmbuild/SOURCES/$(APP_NAME)
-	cp packaging/rpm/$(APP_NAME).spec ~/rpmbuild/SPECS/
-	rpmbuild -bb ~/rpmbuild/SPECS/$(APP_NAME).spec \
+	cp $(DIST_DIR)/$(APP_NAME)-linux-x64 ~/rpmbuild/SOURCES/superpalmtree
+	cp packaging/rpm/superpalmtree.spec ~/rpmbuild/SPECS/
+	rpmbuild -bb ~/rpmbuild/SPECS/superpalmtree.spec \
 		--define "version $(VERSION)" \
 		--define "github_user YOUR_USERNAME"
-	cp ~/rpmbuild/RPMS/x86_64/$(APP_NAME)-*.rpm $(DIST_DIR)/
-	@echo "✓ RPM built: $(DIST_DIR)/$(APP_NAME)-$(VERSION)-1.x86_64.rpm"
+	cp ~/rpmbuild/RPMS/x86_64/superpalmtree-*.rpm $(DIST_DIR)/
+	@echo "✓ RPM built: $(DIST_DIR)/superpalmtree-$(VERSION)-1.x86_64.rpm"
 
 # Install locally
 install:

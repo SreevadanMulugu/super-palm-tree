@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentSmith - Zero Setup AI Agent
+SuperPalmTree - Zero Setup AI Agent
 Single-file agent that "just works" with embedded Ollama and headless browser
 """
 
@@ -16,14 +16,14 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 # Configuration
-APP_NAME = "AgentSmith"
+APP_NAME = "SuperPalmTree"
 APP_VERSION = "1.0.0"
-SANDBOX_DIR = Path.home() / "agentsmith-exp"
-CONFIG_DIR = Path.home() / ".agentsmith"
+SANDBOX_DIR = Path.home() / "superpalmtree-exp"
+CONFIG_DIR = Path.home() / ".superpalmtree"
 OLLAMA_PORT = 11434
 
 
-class AgentSmith:
+class SuperPalmTree:
     """Main agent class - zero setup, just works"""
     
     def __init__(self):
@@ -34,8 +34,8 @@ class AgentSmith:
         self.config = {}
         
         # Ensure directories exist
-        SANDBOX_DIR.mkdir(exist_ok=True)
-        CONFIG_DIR.mkdir(exist_ok=True)
+        SANDBOX_DIR.mkdir(parents=True, exist_ok=True)
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         
     def detect_hardware(self) -> Dict[str, Any]:
         """Detect RAM and set appropriate model/context"""
@@ -196,7 +196,7 @@ class AgentSmith:
 
 def main():
     """Entry point"""
-    agent = AgentSmith()
+    agent = SuperPalmTree()
     
     try:
         # Check for command line arguments

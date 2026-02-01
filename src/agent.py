@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AgentSmith - Complete Zero-Setup AI Agent
+SuperPalmTree - Complete Zero-Setup AI Agent
 Single-file application that "just works"
 
 Features:
@@ -25,14 +25,14 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 
 # Configuration
-APP_NAME = "AgentSmith"
+APP_NAME = "SuperPalmTree"
 APP_VERSION = "1.0.0"
-SANDBOX_DIR = Path.home() / "agentsmith-exp"
-CONFIG_DIR = Path.home() / ".agentsmith"
+SANDBOX_DIR = Path.home() / "superpalmtree-exp"
+CONFIG_DIR = Path.home() / ".superpalmtree"
 OLLAMA_PORT = 11434
 
 # System Prompt for Planning Agent
-PLANNER_SYSTEM_PROMPT = """You are AgentSmith Planner - an expert AI task planner.
+PLANNER_SYSTEM_PROMPT = """You are SuperPalmTree Planner - an expert AI task planner.
 
 Your job: Analyze user requests and create detailed step-by-step execution plans.
 
@@ -41,7 +41,7 @@ RULES:
 2. Each step must use ONE tool: browser, shell, or file
 3. For browser tasks: specify exact URLs and actions
 4. For shell tasks: use only safe commands (ls, cat, grep, wc, head, tail)
-5. For file tasks: specify exact paths in ~/agentsmith-exp/
+5. For file tasks: specify exact paths in ~/superpalmtree-exp/
 6. If login might be needed, include "CHECK_LOGIN" step
 7. Estimate time for each step
 
@@ -73,7 +73,7 @@ OUTPUT FORMAT - JSON:
 }"""
 
 # System Prompt for Execution Agent
-EXECUTOR_SYSTEM_PROMPT = """You are AgentSmith Executor - an expert at executing tasks using tools.
+EXECUTOR_SYSTEM_PROMPT = """You are SuperPalmTree Executor - an expert at executing tasks using tools.
 
 Your job: Execute one step at a time and report results.
 
@@ -120,8 +120,8 @@ class TaskPlan:
             self.created_at = datetime.now().isoformat()
 
 
-class AgentSmith:
-    """Main AgentSmith class"""
+class SuperPalmTree:
+    """Main SuperPalmTree class"""
     
     def __init__(self):
         self.ollama_process = None
@@ -131,8 +131,8 @@ class AgentSmith:
         self.session_log = []
         
         # Ensure directories exist
-        SANDBOX_DIR.mkdir(exist_ok=True)
-        CONFIG_DIR.mkdir(exist_ok=True)
+        SANDBOX_DIR.mkdir(parents=True, exist_ok=True)
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         
     def detect_hardware(self) -> Dict[str, Any]:
         """Detect hardware and set appropriate model"""
@@ -385,7 +385,7 @@ Execute and report results."""
 
 def main():
     """Entry point"""
-    agent = AgentSmith()
+    agent = SuperPalmTree()
     
     try:
         if len(sys.argv) > 1:

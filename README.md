@@ -1,9 +1,9 @@
-# AgentSmith 🤖
+# SuperPalmTree 🤖
 
-[![Build Status](https://github.com/YOUR_USERNAME/agentsmith/workflows/Build%20and%20Release/badge.svg)](https://github.com/YOUR_USERNAME/agentsmith/actions)
+[![Build Status](https://github.com/YOUR_USERNAME/super-palm-tree/workflows/Build%20and%20Release/badge.svg)](https://github.com/YOUR_USERNAME/super-palm-tree/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-AgentSmith is an AI-powered browser automation agent that uses local LLMs for intelligent web interaction. It features autonomous browsing, task execution, and multi-step workflow automation.
+SuperPalmTree is an AI-powered browser automation agent that uses local LLMs for intelligent web interaction. It features autonomous browsing, task execution, and multi-step workflow automation.
 
 ## Features
 
@@ -17,49 +17,49 @@ AgentSmith is an AI-powered browser automation agent that uses local LLMs for in
 
 ### Download Pre-built Binaries
 
-Download the latest release for your platform from the [Releases](https://github.com/YOUR_USERNAME/agentsmith/releases) page.
+Download the latest release for your platform from the [Releases](https://github.com/YOUR_USERNAME/super-palm-tree/releases) page.
 
 #### Linux (Fedora/RHEL/CentOS)
 ```bash
 # Download and install RPM
-sudo dnf install ./agentsmith.rpm
+sudo dnf install ./super-palm-tree.rpm
 # or
-sudo rpm -i agentsmith.rpm
+sudo rpm -i super-palm-tree.rpm
 
 # Run
-agentsmith
+super-palm-tree
 ```
 
 #### Linux (Generic)
 ```bash
 # Download binary
-chmod +x agentsmith-linux-x64
-./agentsmith-linux-x64
+chmod +x super-palm-tree-linux-x64
+./super-palm-tree-linux-x64
 ```
 
 #### macOS
 ```bash
 # Intel Macs
-chmod +x agentsmith-macos-x64
-./agentsmith-macos-x64
+chmod +x super-palm-tree-macos-x64
+./super-palm-tree-macos-x64
 
 # Apple Silicon Macs
-chmod +x agentsmith-macos-arm64
-./agentsmith-macos-arm64
+chmod +x super-palm-tree-macos-arm64
+./super-palm-tree-macos-arm64
 ```
 
 #### Windows
 ```powershell
 # Download and run
-agentsmith-windows-x64.exe
+super-palm-tree-windows-x64.exe
 ```
 
 ### Build from Source
 
 ```bash
 # Clone repository
-git clone https://github.com/YOUR_USERNAME/agentsmith.git
-cd agentsmith
+git clone https://github.com/YOUR_USERNAME/super-palm-tree.git
+cd super-palm-tree
 
 # Install dependencies
 pip install -r requirements.txt
@@ -68,7 +68,7 @@ pip install -r requirements.txt
 python src/main.py
 
 # Or build standalone executable
-pyinstaller --onefile --name agentsmith src/main.py
+pyinstaller --onefile --name super-palm-tree src/main.py
 ```
 
 ## Prerequisites
@@ -88,12 +88,12 @@ ollama pull qwen3:1.7b
 
 ### Interactive Mode
 ```bash
-agentsmith
+super-palm-tree
 ```
 
 ### Single Task Mode
 ```bash
-agentsmith "Go to example.com and find the contact email"
+super-palm-tree "Go to example.com and find the contact email"
 ```
 
 ### Configuration
@@ -125,7 +125,7 @@ black src
 ## Project Structure
 
 ```
-agentsmith/
+super-palm-tree/
 ├── src/                    # Source code
 │   ├── main.py            # Entry point
 │   ├── agent.py           # Core agent logic
@@ -149,15 +149,15 @@ sudo dnf install rpm-build rpmdevtools
 rpmdev-setuptree
 
 # Build RPM
-cp packaging/rpm/agentsmith.spec ~/rpmbuild/SPECS/
-cp dist/agentsmith-linux-x64 ~/rpmbuild/SOURCES/
-rpmbuild -bb ~/rpmbuild/SPECS/agentsmith.spec
+cp packaging/rpm/super-palm-tree.spec ~/rpmbuild/SPECS/
+cp dist/super-palm-tree-linux-x64 ~/rpmbuild/SOURCES/
+rpmbuild -bb ~/rpmbuild/SPECS/super-palm-tree.spec
 ```
 
 ### Standalone Executable
 ```bash
 # Using PyInstaller
-pyinstaller --onefile --name agentsmith src/main.py
+pyinstaller --onefile --name super-palm-tree src/main.py
 ```
 
 ## GitHub Actions

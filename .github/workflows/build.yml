@@ -35,24 +35,26 @@ jobs:
       - name: Build standalone executable
         run: |
           cd src
-          pyinstaller --onefile --name agentsmith main.py
-          mv dist/agentsmith ../agentsmith-linux-x64
+          pyinstaller --onefile --name superpalmtree main.py
+          mv dist/superpalmtree ../super-palm-tree-linux-x64
 
       - name: Build RPM package
         run: |
           mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-          cp agentsmith-linux-x64 ~/rpmbuild/SOURCES/
-          cp packaging/rpm/agentsmith.spec ~/rpmbuild/SPECS/
-          rpmbuild -bb ~/rpmbuild/SPECS/agentsmith.spec
-          cp ~/rpmbuild/RPMS/x86_64/*.rpm ./agentsmith.rpm
+          cp super-palm-tree-linux-x64 ~/rpmbuild/SOURCES/superpalmtree
+          cp packaging/rpm/superpalmtree.spec ~/rpmbuild/SPECS/
+          rpmbuild -bb ~/rpmbuild/SPECS/superpalmtree.spec \
+            --define "version 1.0.0" \
+            --define "github_user ${{ github.repository_owner }}"
+          cp ~/rpmbuild/RPMS/x86_64/*.rpm ./superpalmtree.rpm
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: agentsmith-linux
+          name: super-palm-tree-linux
           path: |
-            agentsmith-linux-x64
-            agentsmith.rpm
+            super-palm-tree-linux-x64
+            superpalmtree.rpm
 
   # Build for Windows
   build-windows:
@@ -75,14 +77,14 @@ jobs:
       - name: Build standalone executable
         run: |
           cd src
-          pyinstaller --onefile --name agentsmith main.py
-          Move-Item -Path dist\agentsmith.exe -Destination ..\agentsmith-windows-x64.exe
+          pyinstaller --onefile --name superpalmtree main.py
+          Move-Item -Path dist\superpalmtree.exe -Destination ..\super-palm-tree-windows-x64.exe
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: agentsmith-windows
-          path: agentsmith-windows-x64.exe
+          name: super-palm-tree-windows
+          path: super-palm-tree-windows-x64.exe
 
   # Build for macOS
   build-macos:
@@ -109,17 +111,17 @@ jobs:
         run: |
           cd src
           if [ "${{ matrix.arch }}" = "arm64" ]; then
-            pyinstaller --onefile --name agentsmith --target-arch arm64 main.py
+            pyinstaller --onefile --name superpalmtree --target-arch arm64 main.py
           else
-            pyinstaller --onefile --name agentsmith --target-arch x86_64 main.py
+            pyinstaller --onefile --name superpalmtree --target-arch x86_64 main.py
           fi
-          mv dist/agentsmith ../agentsmith-macos-${{ matrix.arch }}
+          mv dist/superpalmtree ../super-palm-tree-macos-${{ matrix.arch }}
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: agentsmith-macos-${{ matrix.arch }}
-          path: agentsmith-macos-${{ matrix.arch }}
+          name: super-palm-tree-macos-${{ matrix.arch }}
+          path: super-palm-tree-macos-${{ matrix.arch }}
 
   # Create Release (only on tags)
   release:
@@ -138,11 +140,11 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/agentsmith-linux/agentsmith-linux-x64
-            artifacts/agentsmith-linux/agentsmith.rpm
-            artifacts/agentsmith-windows/agentsmith-windows-x64.exe
-            artifacts/agentsmith-macos-x64/agentsmith-macos-x64
-            artifacts/agentsmith-macos-arm64/agentsmith-macos-arm64
+            artifacts/super-palm-tree-linux/super-palm-tree-linux-x64
+            artifacts/super-palm-tree-linux/superpalmtree.rpm
+            artifacts/super-palm-tree-windows/super-palm-tree-windows-x64.exe
+            artifacts/super-palm-tree-macos-x64/super-palm-tree-macos-x64
+            artifacts/super-palm-tree-macos-arm64/super-palm-tree-macos-arm64
           draft: false
           prerelease: false
         env:

@@ -1,11 +1,11 @@
-# AgentSmith Setup Guide
+# SuperPalmTree Setup Guide
 
 ## Quick Start
 
 ### 1. Create GitHub Repository
 
 1. Go to https://github.com/new
-2. Repository name: `agentsmith`
+2. Repository name: `super-palm-tree`
 3. Make it public (for free GitHub Actions)
 4. Don't initialize with README (we have one)
 5. Click "Create repository"
@@ -14,17 +14,17 @@
 
 ```bash
 # Initialize git
-cd agentsmith
+cd super-palm-tree
 git init
 
 # Add all files
 git add .
 
 # Commit
-git commit -m "Initial commit: AgentSmith AI Agent"
+git commit -m "Initial commit: SuperPalmTree AI Agent"
 
 # Add remote (replace YOUR_USERNAME with your GitHub username)
-git remote add origin https://github.com/YOUR_USERNAME/agentsmith.git
+git remote add origin https://github.com/YOUR_USERNAME/super-palm-tree.git
 
 # Push
 git push -u origin main
@@ -59,35 +59,35 @@ GitHub Actions will automatically:
 ### 5. Download and Install
 
 After the workflow completes, go to:
-`https://github.com/YOUR_USERNAME/agentsmith/releases`
+`https://github.com/YOUR_USERNAME/super-palm-tree/releases`
 
 Download the appropriate binary for your platform.
 
 #### Linux (Fedora/RHEL/CentOS)
 ```bash
-sudo dnf install ./agentsmith.rpm
+sudo dnf install ./super-palm-tree.rpm
 # or
-sudo rpm -i agentsmith.rpm
+sudo rpm -i super-palm-tree.rpm
 
-agentsmith
+super-palm-tree
 ```
 
 #### Linux (Generic)
 ```bash
-chmod +x agentsmith-linux-x64
-./agentsmith-linux-x64
+chmod +x super-palm-tree-linux-x64
+./super-palm-tree-linux-x64
 ```
 
 #### macOS
 ```bash
-chmod +x agentsmith-macos-x64  # or agentsmith-macos-arm64
-./agentsmith-macos-x64
+chmod +x super-palm-tree-macos-x64  # or super-palm-tree-macos-arm64
+./super-palm-tree-macos-x64
 ```
 
 #### Windows
 ```powershell
 # Just run the executable
-agentsmith-windows-x64.exe
+super-palm-tree-windows-x64.exe
 ```
 
 ## Prerequisites
@@ -146,9 +146,9 @@ pip install pyinstaller
 
 # Build
 cd src
-pyinstaller --onefile --name agentsmith main.py
+pyinstaller --onefile --name super-palm-tree main.py
 
-# Binary will be in src/dist/agentsmith
+# Binary will be in src/dist/super-palm-tree
 ```
 
 ### Build RPM Package
@@ -163,13 +163,13 @@ make rpm
 ## Project Structure
 
 ```
-agentsmith/
+super-palm-tree/
 ├── .github/
 │   └── workflows/
 │       └── build.yml          # GitHub Actions CI/CD
 ├── packaging/
 │   └── rpm/
-│       └── agentsmith.spec    # RPM package spec
+│       └── super-palm-tree.spec    # RPM package spec
 ├── src/
 │   ├── main.py                # Entry point
 │   ├── agent.py               # Core agent logic
@@ -229,7 +229,7 @@ ollama serve
 
 **Permission denied:**
 ```bash
-chmod +x agentsmith
+chmod +x super-palm-tree
 ```
 
 **Chrome not found:**
@@ -249,5 +249,5 @@ ollama pull qwen3:1.7b
 
 ## Support
 
-- Issues: https://github.com/YOUR_USERNAME/agentsmith/issues
-- Discussions: https://github.com/YOUR_USERNAME/agentsmith/discussions
+- Issues: https://github.com/YOUR_USERNAME/super-palm-tree/issues
+- Discussions: https://github.com/YOUR_USERNAME/super-palm-tree/discussions
