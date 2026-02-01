@@ -64,29 +64,43 @@ class SuperPalmTree:
         """Start embedded Ollama server"""
         try:
             # Check if Ollama is already running
-            result = subprocess.run(
-                ["curl", "-s", f"http://localhost:{OLLAMA_PORT}/api/tags"],
-                capture_output=True,
-                timeout=2
-            )
-            if result.returncode == 0:
+            import urllib.request
+            try:
+                urllib.request.urlopen(f"http://localhost:{OLLAMA_PORT}/api/tags", timeout=2)
                 print("✓ Ollama already running")
                 return True
+            except:
+                pass
         except:
             pass
+        
+        # Check if Ollama is installed
+        try:
+            subprocess.run(["ollama", "--version"], capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            print("✗ Ollama not found!")
+            print("\nPlease install Ollama first:")
+            print("  macOS/Linux: curl -fsSL https://ollama.com/install.sh | sh")
+            print("  Windows: Download from https://ollama.com/download/windows")
+            print("\nAfter installation, run this app again.")
+            return False
         
         # Start Ollama
         print("Starting Ollama server...")
         env = os.environ.copy()
         env["OLLAMA_HOST"] = f"127.0.0.1:{OLLAMA_PORT}"
         
-        self.ollama_process = subprocess.Popen(
-            ["ollama", "serve"],
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True
-        )
+        try:
+            self.ollama_process = subprocess.Popen(
+                ["ollama", "serve"],
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+        except Exception as e:
+            print(f"✗ Failed to start Ollama: {e}")
+            return False
         
         # Wait for server to be ready
         for i in range(30):
