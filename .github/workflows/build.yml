@@ -27,7 +27,6 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm rpmdevtools
           python -m pip install --upgrade pip
           pip install pyinstaller
           pip install -r requirements.txt
@@ -38,23 +37,11 @@ jobs:
           pyinstaller --onefile --name superpalmtree main.py
           mv dist/superpalmtree ../super-palm-tree-linux-x64
 
-      - name: Build RPM package
-        run: |
-          mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-          cp super-palm-tree-linux-x64 ~/rpmbuild/SOURCES/superpalmtree
-          cp packaging/rpm/superpalmtree.spec ~/rpmbuild/SPECS/
-          rpmbuild -bb ~/rpmbuild/SPECS/superpalmtree.spec \
-            --define "version 1.0.0" \
-            --define "github_user ${{ github.repository_owner }}"
-          cp ~/rpmbuild/RPMS/x86_64/*.rpm ./superpalmtree.rpm
-
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
           name: super-palm-tree-linux
-          path: |
-            super-palm-tree-linux-x64
-            superpalmtree.rpm
+          path: super-palm-tree-linux-x64
 
   # Build for Windows
   build-windows:
@@ -141,7 +128,6 @@ jobs:
         with:
           files: |
             artifacts/super-palm-tree-linux/super-palm-tree-linux-x64
-            artifacts/super-palm-tree-linux/superpalmtree.rpm
             artifacts/super-palm-tree-windows/super-palm-tree-windows-x64.exe
             artifacts/super-palm-tree-macos-x64/super-palm-tree-macos-x64
             artifacts/super-palm-tree-macos-arm64/super-palm-tree-macos-arm64
