@@ -1,19 +1,19 @@
-name: Build and Release (SuperPalmTree)
+name: Build and Release
 
 on:
   push:
-    branches: [main, master]
+    branches: [ main, master ]
     tags:
       - 'v*'
   pull_request:
-    branches: [main, master]
+    branches: [ main, master ]
 
 env:
   PYTHON_VERSION: '3.11'
 
 jobs:
-  # Ubuntu/Debian build → .deb package
-  build-ubuntu:
+  # Build for Linux
+  build-linux:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -26,106 +26,35 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm rpmdevtools
           python -m pip install --upgrade pip
-          pip install pyinstaller websockets psutil
+          pip install pyinstaller
+          pip install -r requirements.txt
 
-      - name: Download Ollama
+      - name: Build standalone executable
         run: |
-          mkdir -p super-palm-tree/embedded/bin/linux
-          curl -sL -o super-palm-tree/embedded/bin/linux/ollama https://ollama.com/download/ollama-linux-amd64
-          chmod +x super-palm-tree/embedded/bin/linux/ollama
+          cd src
+          pyinstaller --onefile --name super-palm-tree main.py
+          mv dist/super-palm-tree ../super-palm-tree-linux-x64
 
-      - name: Download model
-        run: |
-          mkdir -p super-palm-tree/embedded/models
-          curl -sL -o super-palm-tree/embedded/models/qwen3-1.7b.gguf \
-            "https://huggingface.co/bartowski/qwen3-1.7b-GGUF/resolve/main/qwen3-1.7b-q4_0.gguf"
-
-      - name: Build executable
-        run: |
-          cd super-palm-tree
-          pyinstaller --onefile --name super-palm-tree --distpath ../dist src/main.py
-          mv ../dist/super-palm-tree ../dist/super-palm-tree-x64
-
-      - name: Create .deb package
-        run: |
-          mkdir -p pkg/usr/bin pkg/DEBIAN
-          cp dist/super-palm-tree-x64 pkg/usr/bin/super-palm-tree
-          chmod +x pkg/usr/bin/super-palm-tree
-          printf 'Package: super-palm-tree\nVersion: 1.0.0\nSection: utils\nPriority: optional\nArchitecture: amd64\nDepends: libc6\nMaintainer: Team <team@superpalmtree.dev>\nDescription: Zero Setup AI Agent\n' > pkg/DEBIAN/control
-          dpkg-deb --build pkg dist/super-palm-tree_1.0.0_amd64.deb
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: super-palm-tree-ubuntu
-          path: dist/super-palm-tree_1.0.0_amd64.deb
-
-  # Fedora/RHEL build → .rpm package
-  build-fedora:
-    runs-on: ubuntu-latest
-    container: fedora:latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          dnf install -y python3 python3-pip rpmdevtools curl
-          pip3 install -q --upgrade pip
-          pip3 install pyinstaller websockets psutil
-
-      - name: Download Ollama
-        run: |
-          mkdir -p super-palm-tree/embedded/bin/linux
-          curl -sL -o super-palm-tree/embedded/bin/linux/ollama https://ollama.com/download/ollama-linux-amd64
-          chmod +x super-palm-tree/embedded/bin/linux/ollama
-
-      - name: Download model
-        run: |
-          mkdir -p super-palm-tree/embedded/models
-          curl -sL -o super-palm-tree/embedded/models/qwen3-1.7b.gguf \
-            "https://huggingface.co/bartowski/qwen3-1.7b-GGUF/resolve/main/qwen3-1.7b-q4_0.gguf"
-
-      - name: Build executable
-        run: |
-          cd super-palm-tree
-          python3 -m PyInstaller --onefile --name super-palm-tree --distpath ../dist src/main.py
-          mv ../dist/super-palm-tree ../dist/super-palm-tree-x64
-
-      - name: Create .rpm package
+      - name: Build RPM package
         run: |
           mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-          cp dist/super-palm-tree-x64 ~/rpmbuild/SOURCES/super-palm-tree
-          chmod +x ~/rpmbuild/SOURCES/super-palm-tree
-          cat > ~/rpmbuild/SPECS/super-palm-tree.spec << 'SPECEOF'
-Name: super-palm-tree
-Version: 1.0.0
-Release: 1
-Summary: Zero Setup AI Agent
-License: MIT
-BuildArch: x86_64
-
-%description
-A complete AI agent with bundled Ollama and model.
-
-%install
-mkdir -p %{buildroot}/usr/bin
-install -m 755 %{SOURCE0} %{buildroot}/usr/bin/super-palm-tree
-
-%files
-/usr/bin/super-palm-tree
-SPECEOF
+          cp super-palm-tree-linux-x64 ~/rpmbuild/SOURCES/
+          cp packaging/rpm/super-palm-tree.spec ~/rpmbuild/SPECS/
           rpmbuild -bb ~/rpmbuild/SPECS/super-palm-tree.spec
-          cp ~/rpmbuild/RPMS/x86_64/super-palm-tree-*.rpm dist/
+          cp ~/rpmbuild/RPMS/x86_64/*.rpm ./super-palm-tree.rpm
 
-      - name: Upload artifact
+      - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: super-palm-tree-fedora
-          path: dist/super-palm-tree-*.rpm
+          name: super-palm-tree-linux
+          path: |
+            super-palm-tree-linux-x64
+            super-palm-tree.rpm
 
-  # Windows build → standalone .exe
+  # Build for Windows
   build-windows:
     runs-on: windows-latest
     steps:
@@ -139,27 +68,23 @@ SPECEOF
 
       - name: Install dependencies
         run: |
-          python -m pip install -q --upgrade pip
-          pip install pyinstaller websockets psutil
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt
 
-      - name: Download Ollama
+      - name: Build standalone executable
         run: |
-          mkdir -p super-palm-tree\embedded\bin\windows
-          curl -sL -o super-palm-tree\embedded\bin\windows\ollama.exe https://ollama.com/download/ollama-windows-amd64.exe
+          cd src
+          pyinstaller --onefile --name super-palm-tree main.py
+          Move-Item -Path dist\super-palm-tree.exe -Destination ..\super-palm-tree-windows-x64.exe
 
-      - name: Build executable
-        run: |
-          cd super-palm-tree
-          pyinstaller --onefile --name super-palm-tree --distpath ../dist src/main.py
-          mv ../dist/super-palm-tree.exe ../dist/super-palm-tree-windows-x64.exe
-
-      - name: Upload artifact
+      - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: super-palm-tree-windows
-          path: dist/super-palm-tree-windows-x64.exe
+          path: super-palm-tree-windows-x64.exe
 
-  # macOS builds → universal binaries for x64 and arm64
+  # Build for macOS
   build-macos:
     runs-on: macos-latest
     strategy:
@@ -176,43 +101,35 @@ SPECEOF
 
       - name: Install dependencies
         run: |
-          python -m pip install -q --upgrade pip
-          pip install pyinstaller websockets psutil
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt
 
-      - name: Download Ollama
+      - name: Build standalone executable
         run: |
-          mkdir -p super-palm-tree/embedded/bin/macos
+          cd src
           if [ "${{ matrix.arch }}" = "arm64" ]; then
-            curl -sL -o super-palm-tree/embedded/bin/macos/ollama https://ollama.com/download/ollama-darwin-arm64
+            pyinstaller --onefile --name super-palm-tree --target-arch arm64 main.py
           else
-            curl -sL -o super-palm-tree/embedded/bin/macos/ollama https://ollama.com/download/ollama-darwin-amd64
+            pyinstaller --onefile --name super-palm-tree --target-arch x86_64 main.py
           fi
-          chmod +x super-palm-tree/embedded/bin/macos/ollama
+          mv dist/super-palm-tree ../super-palm-tree-macos-${{ matrix.arch }}
 
-      - name: Build executable
-        run: |
-          cd super-palm-tree
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            pyinstaller --onefile --name super-palm-tree --target-arch arm64 --distpath ../dist src/main.py
-          else
-            pyinstaller --onefile --name super-palm-tree --target-arch x86_64 --distpath ../dist src/main.py
-          fi
-          mv ../dist/super-palm-tree ../dist/super-palm-tree-macos-${{ matrix.arch }}
-
-      - name: Upload artifact
+      - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: super-palm-tree-macos-${{ matrix.arch }}
-          path: dist/super-palm-tree-macos-${{ matrix.arch }}
+          path: super-palm-tree-macos-${{ matrix.arch }}
 
+  # Create Release (only on tags)
   release:
-    needs: [build-ubuntu, build-fedora, build-windows, build-macos]
+    needs: [build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     steps:
-      - name: Download artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -221,8 +138,8 @@ SPECEOF
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/super-palm-tree-ubuntu/super-palm-tree_1.0.0_amd64.deb
-            artifacts/super-palm-tree-fedora/super-palm-tree-*.rpm
+            artifacts/super-palm-tree-linux/super-palm-tree-linux-x64
+            artifacts/super-palm-tree-linux/super-palm-tree.rpm
             artifacts/super-palm-tree-windows/super-palm-tree-windows-x64.exe
             artifacts/super-palm-tree-macos-x64/super-palm-tree-macos-x64
             artifacts/super-palm-tree-macos-arm64/super-palm-tree-macos-arm64
