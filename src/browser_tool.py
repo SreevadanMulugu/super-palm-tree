@@ -1,376 +1,449 @@
 #!/usr/bin/env python3
 """
-Browser Tool - Headless Chromium automation for SuperPalmTree
-Uses CDP (Chrome DevTools Protocol) for control
+SuperPalmTree Browser Tool - DOM/ARIA Approach
+Uses Playwright for browser automation with ARIA accessibility tree snapshots.
+Returns semantic element refs instead of heavy HTML - optimized for small models.
+
+Port: 9223 (isolated from system Chrome on 9222)
+Profile: ~/.superpalmtree/chromium/
 """
 
-import subprocess
 import asyncio
-import json
-import time
-import websockets
+import re
+from typing import Optional, Tuple, Dict, List, Any
 from pathlib import Path
-from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass
+
+# Configuration
+CHROME_DEBUG_PORT = 9223
+DATA_DIR = Path.home() / ".superpalmtree"
+CHROMIUM_PROFILE = DATA_DIR / "chromium"
 
 
 @dataclass
-class BrowserElement:
-    """Represents a browser element"""
-    ref: str
-    tag: str
-    text: str
-    attributes: Dict[str, str]
+class ElementRef:
+    """Reference to a page element"""
+    ref: str  # e.g., "e5"
+    role: str  # e.g., "link", "button", "textbox"
+    name: str  # accessible name
+    selector: str  # CSS selector for interaction
 
 
 class CDPBrowser:
-    """Headless Chromium browser controller via CDP"""
-    
+    """
+    Browser automation using Playwright with ARIA tree snapshots.
+    Compatible with existing agent.py interface.
+
+    Instead of returning raw HTML, returns structured ARIA snapshots:
+    - heading "Example Domain" [ref=e3]
+    - link "More information..." [ref=e5]
+
+    Agent can then use: click("e5") to interact.
+    """
+
     def __init__(self):
-        self.chrome_process = None
-        self.ws_url: Optional[str] = None
-        self.ws = None
-        self.message_id = 0
+        self.playwright = None
+        self.browser = None
+        self.context = None
+        self.page = None
         self.is_headless = True
-        self.connected = False
-    
+        self.current_url = ""
+        self.element_refs: Dict[str, ElementRef] = {}
+        self._ref_counter = 0
+
     async def start(self, headless: bool = True) -> bool:
-        """Start headless Chromium"""
-        self.is_headless = headless
-        
+        """
+        Start browser with isolated profile.
+
+        Args:
+            headless: If False, browser window is visible (user can watch)
+
+        Returns:
+            True if started successfully
+        """
         try:
-            # Find Chrome/Chromium
-            chrome_path = self._find_chrome()
-            if not chrome_path:
-                print("Chrome/Chromium not found")
-                return False
-            
-            # Launch Chrome with remote debugging
-            port = 9223
-            args = [
-                str(chrome_path),
-                f"--remote-debugging-port={port}",
-                "--no-first-run",
-                "--no-default-browser-check",
-                "--disable-default-apps",
-                "--disable-popup-blocking",
-                "--disable-translate",
-                "--disable-extensions",
-                "--disable-background-networking",
-                "--safebrowsing-disable-auto-update",
-                "--disable-sync",
-                "--metrics-recording-only",
-                "--mute-audio",
-                "--disable-dev-shm-usage",
-            ]
-            
-            if headless:
-                args.append("--headless=new")
-                args.append("--no-sandbox")
-            
-            print(f"Starting Chrome from: {chrome_path}")
-            
-            self.chrome_process = subprocess.Popen(
-                args,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+            from playwright.async_api import async_playwright
+
+            self.is_headless = headless
+
+            # Ensure profile directory exists
+            CHROMIUM_PROFILE.mkdir(parents=True, exist_ok=True)
+
+            # Start Playwright
+            self.playwright = await async_playwright().start()
+
+            # Launch Chromium with isolated profile
+            self.browser = await self.playwright.chromium.launch(
+                headless=headless,
+                args=[
+                    f"--remote-debugging-port={CHROME_DEBUG_PORT}",
+                    f"--user-data-dir={CHROMIUM_PROFILE}",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "--disable-sync",
+                ]
             )
-            
-            # Wait for Chrome to start
-            await asyncio.sleep(2)
-            
-            # Get WebSocket URL
-            import urllib.request
-            with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=10) as resp:
-                data = json.loads(resp.read().decode())
-                self.ws_url = data.get("webSocketDebuggerUrl")
-            
-            if not self.ws_url:
-                print("Could not get WebSocket URL")
-                return False
-            
-            # Connect to Chrome
-            self.ws = await websockets.connect(self.ws_url)
-            
-            # Enable page events
-            await self._send_command("Page.enable")
-            await self._send_command("Runtime.enable")
-            
-            self.connected = True
-            print("✓ Browser started")
+
+            # Create context with reasonable viewport
+            self.context = await self.browser.new_context(
+                viewport={"width": 1280, "height": 800},
+                user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
+
+            # Create page
+            self.page = await self.context.new_page()
+
+            print(f"[browser] Started {'headless' if headless else 'visible'} on port {CHROME_DEBUG_PORT}")
             return True
-            
+
         except Exception as e:
-            print(f"Error starting browser: {e}")
+            print(f"[browser] Failed to start: {e}")
             return False
-    
-    def _find_chrome(self) -> Optional[Path]:
-        """Find Chrome/Chromium binary"""
-        import platform
-        
-        system = platform.system()
-        
-        if system == "Linux":
-            paths = [
-                Path("/usr/bin/chromium-browser"),
-                Path("/usr/bin/chromium"),
-                Path("/usr/bin/google-chrome"),
-                Path("/snap/bin/chromium"),
-            ]
-        elif system == "Darwin":
-            paths = [
-                Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
-                Path("/Applications/Chromium.app/Contents/MacOS/Chromium"),
-            ]
-        elif system == "Windows":
-            paths = [
-                Path("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"),
-                Path("C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"),
-                Path(os.environ.get("LOCALAPPDATA", "") + "\\Google\\Chrome\\Application\\chrome.exe"),
-            ]
-        else:
-            paths = []
-        
-        for path in paths:
-            if path.exists():
-                return path
-        
-        return None
-    
-    async def _send_command(self, method: str, params: Dict = None) -> Dict:
-        """Send CDP command"""
-        self.message_id += 1
-        message = {
-            "id": self.message_id,
-            "method": method,
-            "params": params or {}
+
+    async def navigate(self, url: str, wait_for: str = "domcontentloaded") -> Tuple[bool, str]:
+        """
+        Navigate to URL.
+
+        Args:
+            url: URL to navigate to
+            wait_for: Wait condition - "domcontentloaded", "load", or "networkidle"
+
+        Returns:
+            Tuple of (success, message)
+        """
+        if not self.page:
+            return False, "Browser not started"
+
+        try:
+            # Ensure URL has protocol
+            if not url.startswith(("http://", "https://")):
+                url = "https://" + url
+
+            # Navigate
+            response = await self.page.goto(url, wait_until=wait_for, timeout=30000)
+
+            self.current_url = self.page.url
+
+            if response and response.ok:
+                return True, f"Navigated to {self.current_url}"
+            elif response:
+                return True, f"Navigated to {self.current_url} (status: {response.status})"
+            else:
+                return True, f"Navigated to {self.current_url}"
+
+        except Exception as e:
+            return False, f"Navigation failed: {e}"
+
+    async def snapshot(self) -> str:
+        """
+        Get ARIA accessibility tree snapshot of the page.
+        Returns semantic elements with refs for interaction.
+
+        This is the key difference from CDP/HTML approach:
+        - Light tokens (100-500 vs 10000+)
+        - Semantic meaning preserved
+        - Easy for small models to parse
+
+        Returns:
+            ARIA tree as formatted string
+        """
+        if not self.page:
+            return "[error] Browser not started"
+
+        try:
+            # Clear previous refs
+            self.element_refs.clear()
+            self._ref_counter = 0
+
+            # Get accessibility tree
+            snapshot = await self.page.accessibility.snapshot()
+
+            if not snapshot:
+                return "[page] Empty or inaccessible page"
+
+            # Format tree with refs
+            lines = []
+            lines.append(f"[page] {self.current_url}")
+            lines.append("")
+
+            self._format_node(snapshot, lines, indent=0)
+
+            return "\n".join(lines)
+
+        except Exception as e:
+            return f"[error] Failed to get snapshot: {e}"
+
+    def _format_node(self, node: Dict, lines: List[str], indent: int):
+        """Recursively format accessibility tree node"""
+        role = node.get("role", "")
+        name = node.get("name", "")
+
+        # Skip generic/uninteresting nodes
+        skip_roles = {"none", "generic", "group", "document", "main", "navigation", "banner", "contentinfo"}
+
+        # Include roles that are actionable or informative
+        include_roles = {
+            "heading", "link", "button", "textbox", "checkbox", "radio",
+            "combobox", "listbox", "option", "menuitem", "tab", "tabpanel",
+            "img", "figure", "article", "section", "list", "listitem",
+            "text", "paragraph", "table", "row", "cell", "form"
         }
-        
-        await self.ws.send(json.dumps(message))
-        
-        # Wait for response
-        while True:
-            response = await self.ws.recv()
-            data = json.loads(response)
-            if data.get("id") == self.message_id:
-                return data
-    
-    async def navigate(self, url: str) -> Tuple[bool, str]:
-        """Navigate to URL"""
-        try:
-            result = await self._send_command("Page.navigate", {"url": url})
-            await asyncio.sleep(3)
-            
-            # Check for login page
-            is_login = await self._is_login_page()
-            if is_login:
-                return True, "LOGIN_REQUIRED"
-            
-            return True, f"Navigated to {url}"
-        except Exception as e:
-            return False, str(e)
-    
-    async def _is_login_page(self) -> bool:
-        """Detect if current page is a login page"""
-        try:
-            script = """() => {
-                const html = document.body.innerText.toLowerCase();
-                return (html.includes('login') || html.includes('sign in') || html.includes('password')) && 
-                       document.querySelector('input[type="password"]') !== null;
-            }"""
-            
-            result = await self._send_command("Runtime.evaluate", {
-                "expression": script,
-                "returnByValue": True
-            })
-            
-            return result.get("result", {}).get("result", {}).get("value", False)
-        except:
+
+        if role in include_roles and name:
+            # Generate ref for interactive elements
+            ref = ""
+            if role in {"link", "button", "textbox", "checkbox", "radio", "combobox", "option", "menuitem", "tab"}:
+                ref = self._generate_ref(node, role, name)
+
+            # Format line
+            prefix = "  " * indent
+            if role == "heading":
+                level = node.get("level", 1)
+                line = f"{prefix}{'#' * level} {name}"
+            elif role == "link":
+                line = f"{prefix}- link \"{name}\" [ref={ref}]"
+            elif role == "button":
+                line = f"{prefix}- button \"{name}\" [ref={ref}]"
+            elif role == "textbox":
+                value = node.get("value", "")
+                placeholder = f" ({value})" if value else ""
+                line = f"{prefix}- input \"{name}\"{placeholder} [ref={ref}]"
+            elif role == "img":
+                line = f"{prefix}- image \"{name}\""
+            elif role == "listitem":
+                line = f"{prefix}  * {name}"
+            else:
+                line = f"{prefix}- {role}: \"{name}\""
+                if ref:
+                    line += f" [ref={ref}]"
+
+            lines.append(line)
+
+        # Process children
+        children = node.get("children", [])
+        for child in children:
+            self._format_node(child, lines, indent + (1 if role in include_roles else 0))
+
+    def _generate_ref(self, node: Dict, role: str, name: str) -> str:
+        """Generate a reference ID and store element info"""
+        self._ref_counter += 1
+        ref = f"e{self._ref_counter}"
+
+        # Build selector based on role and name
+        selector = self._build_selector(role, name)
+
+        self.element_refs[ref] = ElementRef(
+            ref=ref,
+            role=role,
+            name=name,
+            selector=selector
+        )
+
+        return ref
+
+    def _build_selector(self, role: str, name: str) -> str:
+        """Build CSS selector from role and accessible name"""
+        # Escape special characters in name for selector
+        safe_name = name.replace('"', '\\"').replace("'", "\\'")
+
+        role_selectors = {
+            "link": f'a:has-text("{safe_name}")',
+            "button": f'button:has-text("{safe_name}"), [role="button"]:has-text("{safe_name}")',
+            "textbox": f'input[placeholder*="{safe_name}"], input[aria-label*="{safe_name}"], textarea[placeholder*="{safe_name}"]',
+            "checkbox": f'input[type="checkbox"][aria-label*="{safe_name}"]',
+            "radio": f'input[type="radio"][aria-label*="{safe_name}"]',
+            "combobox": f'select[aria-label*="{safe_name}"], [role="combobox"]:has-text("{safe_name}")',
+            "option": f'option:has-text("{safe_name}")',
+            "menuitem": f'[role="menuitem"]:has-text("{safe_name}")',
+            "tab": f'[role="tab"]:has-text("{safe_name}")',
+        }
+
+        return role_selectors.get(role, f':has-text("{safe_name}")')
+
+    async def click(self, ref_or_selector: str) -> bool:
+        """
+        Click an element by ref or CSS selector.
+
+        Args:
+            ref_or_selector: Element ref (e.g., "e5") or CSS selector
+
+        Returns:
+            True if clicked successfully
+        """
+        if not self.page:
             return False
-    
-    async def get_page_content(self) -> str:
-        """Get page text content"""
+
         try:
-            script = """() => {
-                return document.body.innerText || document.body.textContent || '';
-            }"""
-            
-            result = await self._send_command("Runtime.evaluate", {
-                "expression": script,
-                "returnByValue": True
-            })
-            
-            return result.get("result", {}).get("result", {}).get("value", "")
-        except Exception as e:
-            return f"Error: {e}"
-    
-    async def find_element(self, selector: str) -> Optional[BrowserElement]:
-        """Find element by CSS selector"""
-        try:
-            script = f"""() => {{
-                const el = document.querySelector('{selector}');
-                if (!el) return null;
-                return {{
-                    tag: el.tagName,
-                    text: el.innerText || el.textContent || '',
-                    attributes: Array.from(el.attributes).reduce((acc, attr) => {{
-                        acc[attr.name] = attr.value;
-                        return acc;
-                    }}, {{}})
-                }};
-            }}"""
-            
-            result = await self._send_command("Runtime.evaluate", {
-                "expression": script,
-                "returnByValue": True
-            })
-            
-            data = result.get("result", {}).get("result", {}).get("value")
-            if data:
-                return BrowserElement(
-                    ref=selector,
-                    tag=data.get("tag", ""),
-                    text=data.get("text", ""),
-                    attributes=data.get("attributes", {})
-                )
-            return None
-            
-        except Exception as e:
-            print(f"Find error: {e}")
-            return None
-    
-    async def click(self, selector: str) -> Tuple[bool, str]:
-        """Click element by CSS selector"""
-        try:
-            script = f"""() => {{
-                const el = document.querySelector('{selector}');
-                if (el) {{
-                    el.click();
-                    return true;
-                }}
-                return false;
-            }}"""
-            
-            result = await self._send_command("Runtime.evaluate", {
-                "expression": script,
-                "returnByValue": True
-            })
-            
-            success = result.get("result", {}).get("result", {}).get("value", False)
-            return success, f"Clicked {selector}" if success else f"Element not found: {selector}"
-            
-        except Exception as e:
-            return False, str(e)
-    
-    async def type_text(self, selector: str, text: str) -> Tuple[bool, str]:
-        """Type text into element"""
-        try:
-            await self._send_command("Runtime.evaluate", {
-                "expression": f"document.querySelector('{selector}').focus()"
-            })
-            
-            for char in text:
-                await self._send_command("Input.dispatchKeyEvent", {
-                    "type": "char",
-                    "text": char
-                })
-                await asyncio.sleep(0.01)
-            
-            return True, f"Typed into {selector}"
-            
-        except Exception as e:
-            return False, str(e)
-    
-    async def get_current_url(self) -> str:
-        """Get current page URL"""
-        try:
-            result = await self._send_command("Runtime.evaluate", {
-                "expression": "window.location.href",
-                "returnByValue": True
-            })
-            return result.get("result", {}).get("result", {}).get("value", "")
-        except:
-            return ""
-    
-    async def scroll_down(self, pixels: int = 500) -> Tuple[bool, str]:
-        """Scroll down the page"""
-        try:
-            await self._send_command("Runtime.evaluate", {
-                "expression": f"window.scrollBy(0, {pixels})"
-            })
+            # Check if it's a ref
+            if ref_or_selector.startswith("e") and ref_or_selector[1:].isdigit():
+                element_info = self.element_refs.get(ref_or_selector)
+                if element_info:
+                    selector = element_info.selector
+                    print(f"[browser] Clicking {ref_or_selector} ({element_info.role}: \"{element_info.name}\")")
+                else:
+                    print(f"[browser] Unknown ref: {ref_or_selector}")
+                    return False
+            else:
+                selector = ref_or_selector
+                print(f"[browser] Clicking selector: {selector}")
+
+            # Try to click
+            await self.page.click(selector, timeout=10000)
+
+            # Wait for potential navigation/updates
             await asyncio.sleep(0.5)
-            return True, f"Scrolled {pixels}px"
+
+            return True
+
         except Exception as e:
-            return False, str(e)
-    
-    async def stop(self):
-        """Stop browser"""
-        if self.ws:
-            try:
-                await self.ws.close()
-            except:
-                pass
-        if self.chrome_process:
-            self.chrome_process.terminate()
-            try:
-                self.chrome_process.wait(timeout=5)
-            except:
-                self.chrome_process.kill()
-        self.connected = False
+            print(f"[browser] Click failed: {e}")
+            return False
 
+    async def type_text(self, ref_or_selector: str, text: str) -> bool:
+        """
+        Type text into an input element.
 
-class BrowserTool:
-    """High-level browser tool for agent"""
-    
-    def __init__(self):
-        self.browser = CDPBrowser()
-    
-    async def start(self) -> bool:
-        """Start browser tool in headless mode"""
-        return await self.browser.start(headless=True)
-    
-    async def navigate(self, url: str) -> Tuple[bool, str]:
-        """Navigate to URL"""
-        return await self.browser.navigate(url)
-    
-    async def get_content(self) -> str:
-        """Get page content"""
-        return await self.browser.get_page_content()
-    
-    async def click(self, selector: str) -> Tuple[bool, str]:
-        """Click an element"""
-        return await self.browser.click(selector)
-    
-    async def type(self, selector: str, text: str) -> Tuple[bool, str]:
-        """Type text into an element"""
-        return await self.browser.type_text(selector, text)
-    
+        Args:
+            ref_or_selector: Element ref or CSS selector
+            text: Text to type
+
+        Returns:
+            True if typed successfully
+        """
+        if not self.page:
+            return False
+
+        try:
+            # Resolve ref to selector
+            if ref_or_selector.startswith("e") and ref_or_selector[1:].isdigit():
+                element_info = self.element_refs.get(ref_or_selector)
+                if element_info:
+                    selector = element_info.selector
+                    print(f"[browser] Typing into {ref_or_selector} ({element_info.name})")
+                else:
+                    return False
+            else:
+                selector = ref_or_selector
+
+            # Clear and type
+            await self.page.fill(selector, text, timeout=10000)
+
+            return True
+
+        except Exception as e:
+            print(f"[browser] Type failed: {e}")
+            return False
+
+    async def get_page_content(self) -> str:
+        """
+        Get page content as ARIA snapshot (not raw HTML).
+        This is the main method called by agent.py.
+
+        Returns:
+            ARIA tree snapshot
+        """
+        return await self.snapshot()
+
+    async def screenshot(self, path: Optional[str] = None) -> Optional[bytes]:
+        """
+        Take screenshot of current page.
+
+        Args:
+            path: Optional path to save screenshot
+
+        Returns:
+            Screenshot bytes if no path provided
+        """
+        if not self.page:
+            return None
+
+        try:
+            if path:
+                await self.page.screenshot(path=path, full_page=False)
+                print(f"[browser] Screenshot saved to {path}")
+                return None
+            else:
+                return await self.page.screenshot(full_page=False)
+
+        except Exception as e:
+            print(f"[browser] Screenshot failed: {e}")
+            return None
+
     async def stop(self):
-        """Stop browser"""
-        await self.browser.stop()
+        """Stop browser and cleanup"""
+        try:
+            if self.page:
+                await self.page.close()
+            if self.context:
+                await self.context.close()
+            if self.browser:
+                await self.browser.close()
+            if self.playwright:
+                await self.playwright.stop()
+
+            self.page = None
+            self.context = None
+            self.browser = None
+            self.playwright = None
+
+            print("[browser] Stopped")
+
+        except Exception as e:
+            print(f"[browser] Error stopping: {e}")
+
+    # Convenience methods for common actions
+
+    async def press(self, key: str) -> bool:
+        """Press a key (e.g., 'Enter', 'Tab', 'Escape')"""
+        if not self.page:
+            return False
+        try:
+            await self.page.keyboard.press(key)
+            return True
+        except Exception as e:
+            print(f"[browser] Press failed: {e}")
+            return False
+
+    async def wait(self, seconds: float):
+        """Wait for specified seconds"""
+        await asyncio.sleep(seconds)
+
+    async def scroll(self, direction: str = "down", amount: int = 500):
+        """Scroll page up or down"""
+        if not self.page:
+            return
+        try:
+            delta = amount if direction == "down" else -amount
+            await self.page.mouse.wheel(0, delta)
+        except Exception as e:
+            print(f"[browser] Scroll failed: {e}")
 
 
 # Test function
 async def test_browser():
-    """Test browser functionality"""
-    browser = BrowserTool()
-    
+    """Test browser tool"""
+    browser = CDPBrowser()
+
     print("Starting browser...")
-    if await browser.start():
-        print("✓ Browser started")
-        
-        print("\nNavigating to example.com...")
-        success, result = await browser.navigate("https://example.com")
-        print(f"Result: {result}")
-        
-        if success:
-            content = await browser.get_content()
-            print(f"Content: {content[:200]}...")
-        
-        await browser.stop()
-        print("\n✓ Browser stopped")
-    else:
-        print("✗ Failed to start browser")
+    if not await browser.start(headless=False):
+        print("Failed to start browser")
+        return
+
+    print("\nNavigating to example.com...")
+    success, msg = await browser.navigate("https://example.com")
+    print(f"  {msg}")
+
+    print("\nGetting ARIA snapshot...")
+    snapshot = await browser.snapshot()
+    print(snapshot)
+
+    print("\nWaiting 5 seconds so you can see...")
+    await browser.wait(5)
+
+    print("\nStopping browser...")
+    await browser.stop()
+
+    print("Done!")
 
 
 if __name__ == "__main__":
