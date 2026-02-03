@@ -72,26 +72,17 @@ class CDPBrowser:
             # Start Playwright
             self.playwright = await async_playwright().start()
 
-            # Launch Chromium with isolated profile
-            self.browser = await self.playwright.chromium.launch(
+            # Launch with persistent context for isolated profile
+            self.context = await self.playwright.chromium.launch_persistent_context(
+                str(CHROMIUM_PROFILE),
                 headless=headless,
-                args=[
-                    f"--remote-debugging-port={CHROME_DEBUG_PORT}",
-                    f"--user-data-dir={CHROMIUM_PROFILE}",
-                    "--no-first-run",
-                    "--no-default-browser-check",
-                    "--disable-sync",
-                ]
-            )
-
-            # Create context with reasonable viewport
-            self.context = await self.browser.new_context(
                 viewport={"width": 1280, "height": 800},
-                user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
             )
 
-            # Create page
-            self.page = await self.context.new_page()
+            # Get page
+            self.page = self.context.pages[0] if self.context.pages else await self.context.new_page()
+            self.browser = self.context  # For compatibility
 
             print(f"[browser] Started {'headless' if headless else 'visible'} on port {CHROME_DEBUG_PORT}")
             return True
@@ -136,42 +127,59 @@ class CDPBrowser:
 
     async def snapshot(self) -> str:
         """
-        Get ARIA accessibility tree snapshot of the page.
-        Returns semantic elements with refs for interaction.
-
-        This is the key difference from CDP/HTML approach:
-        - Light tokens (100-500 vs 10000+)
-        - Semantic meaning preserved
-        - Easy for small models to parse
-
-        Returns:
-            ARIA tree as formatted string
+        Get semantic elements from page using Playwright's role selectors.
+        Returns elements with refs for interaction.
         """
         if not self.page:
             return "[error] Browser not started"
 
         try:
-            # Clear previous refs
             self.element_refs.clear()
             self._ref_counter = 0
+            lines = [f"[page] {self.current_url}", ""]
 
-            # Get accessibility tree
-            snapshot = await self.page.accessibility.snapshot()
+            # Get headings
+            headings = await self.page.get_by_role("heading").all()
+            for h in headings:
+                text = await h.text_content()
+                if text:
+                    lines.append(f"# {text.strip()}")
 
-            if not snapshot:
-                return "[page] Empty or inaccessible page"
+            # Get links with refs
+            links = await self.page.get_by_role("link").all()
+            for link in links:
+                text = await link.text_content()
+                if text and text.strip():
+                    ref = self._add_ref("link", text.strip(), link)
+                    lines.append(f"- link \"{text.strip()}\" [ref={ref}]")
 
-            # Format tree with refs
-            lines = []
-            lines.append(f"[page] {self.current_url}")
-            lines.append("")
+            # Get buttons with refs
+            buttons = await self.page.get_by_role("button").all()
+            for btn in buttons:
+                text = await btn.text_content()
+                if text and text.strip():
+                    ref = self._add_ref("button", text.strip(), btn)
+                    lines.append(f"- button \"{text.strip()}\" [ref={ref}]")
 
-            self._format_node(snapshot, lines, indent=0)
+            # Get inputs with refs
+            inputs = await self.page.get_by_role("textbox").all()
+            for inp in inputs:
+                placeholder = await inp.get_attribute("placeholder") or "input"
+                ref = self._add_ref("textbox", placeholder, inp)
+                lines.append(f"- input \"{placeholder}\" [ref={ref}]")
 
             return "\n".join(lines)
 
         except Exception as e:
-            return f"[error] Failed to get snapshot: {e}"
+            return f"[error] {e}"
+
+    def _add_ref(self, role: str, name: str, locator) -> str:
+        """Add element ref and return ref ID"""
+        self._ref_counter += 1
+        ref = f"e{self._ref_counter}"
+        self.element_refs[ref] = ElementRef(ref=ref, role=role, name=name, selector="")
+        self.element_refs[ref].locator = locator  # Store actual locator
+        return ref
 
     def _format_node(self, node: Dict, lines: List[str], indent: int):
         """Recursively format accessibility tree node"""
