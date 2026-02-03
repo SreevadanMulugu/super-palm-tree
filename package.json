@@ -1,0 +1,73 @@
+{
+    "name": "super-palm-tree",
+    "version": "1.0.0",
+    "description": "Zero-Setup AI Agent with Embedded Ollama and Browser Automation",
+    "main": "src/main.js",
+    "scripts": {
+        "start": "electron .",
+        "dev": "electron . --dev",
+        "build": "electron-builder",
+        "dist": "electron-builder --publish=never"
+    },
+    "keywords": [
+        "ai",
+        "agent",
+        "ollama",
+        "browser-automation",
+        "electron"
+    ],
+    "author": "SuperPalmTree Team",
+    "license": "MIT",
+    "devDependencies": {
+        "electron": "^28.0.0",
+        "electron-builder": "^24.9.1"
+    },
+    "dependencies": {},
+    "build": {
+        "appId": "com.superpalmtree.app",
+        "productName": "SuperPalmTree",
+        "directories": {
+            "output": "dist"
+        },
+        "files": [
+            "src/**/*",
+            "embedded/**/*",
+            "package.json"
+        ],
+        "extraResources": [
+            {
+                "from": "embedded/bin",
+                "to": "bin"
+            }
+        ],
+        "mac": {
+            "category": "public.app-category.productivity",
+            "hardenedRuntime": true,
+            "extraFiles": [
+                {
+                    "from": "embedded/bin/macos/ollama",
+                    "to": "ollama"
+                }
+            ]
+        },
+        "win": {
+            "target": "nsis",
+            "extraFiles": [
+                {
+                    "from": "embedded/bin/windows/ollama.exe",
+                    "to": "ollama.exe"
+                }
+            ]
+        },
+        "linux": {
+            "target": "AppImage",
+            "category": "Utility",
+            "extraFiles": [
+                {
+                    "from": "embedded/bin/linux/ollama",
+                    "to": "ollama"
+                }
+            ]
+        }
+    }
+}

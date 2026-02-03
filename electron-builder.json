@@ -1,0 +1,23 @@
+{
+    "appId": "com.superpalmtree.app",
+    "productName": "SuperPalmTree",
+    "directories": {
+        "output": "dist"
+    },
+    "files": [
+        "src/**/*",
+        "embedded/**/*",
+        "package.json"
+    ],
+    "mac": {
+        "category": "public.app-category.productivity",
+        "hardenedRuntime": true
+    },
+    "win": {
+        "target": "nsis"
+    },
+    "linux": {
+        "target": "AppImage",
+        "category": "Utility"
+    }
+}
